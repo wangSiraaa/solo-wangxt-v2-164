@@ -1,0 +1,51 @@
+# 机票服务培训演示：PostgreSQL 正式存储（全部为虚构航班/舱位/规则数据）。
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: airfare_demo
+      POSTGRES_USER: airfare
+      POSTGRES_PASSWORD: airfare
+    ports:
+      - "5432:5432"
+    volumes:
+      - airfare_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airfare -d airfare_demo"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DB_ENGINE: postgres
+      DB_NAME: airfare_demo
+      DB_USER: airfare
+      DB_PASSWORD: airfare
+      DB_HOST: db
+      DB_PORT: "5432"
+      DJANGO_DEBUG: "1"
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_demo &&
+             python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
+
+volumes:
+  airfare_pgdata:
